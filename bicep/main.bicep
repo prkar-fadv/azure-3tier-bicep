@@ -24,7 +24,7 @@ var webSubnetCidr = '10.0.1.0/24'
 var appSubnetCidr = '10.0.2.0/24'
 var dbSubnetCidr  = '10.0.3.0/24'
 
-// Static private IPs for simplicity (so reverse proxy can target app & app can target db)
+// Static private IPs
 var webPrivateIp = '10.0.1.4'
 var appPrivateIp = '10.0.2.4'
 var dbPrivateIp  = '10.0.3.4'
@@ -274,7 +274,7 @@ resource dbNic 'Microsoft.Network/networkInterfaces@2023-05-01' = {
 // ============== CustomData (cloud-init) ==============
 
 // WEB: Nginx + reverse proxy to app
-var webUserData = base64("""
+var webUserData = base64('''
 #cloud-config
 runcmd:
   - apt-get update
@@ -318,25 +318,25 @@ server {
   server_name _;
 
   location / {
-    try_files \$uri \$uri/ =404;
+    try_files $uri $uri/ =404;
   }
 
   # Reverse-proxy API calls to App VM (private)
   location /api/ {
     proxy_pass http://${appPrivateIp}:8080/;
     proxy_http_version 1.1;
-    proxy_set_header Upgrade \$http_upgrade;
+    proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection 'upgrade';
-    proxy_set_header Host \$host;
-    proxy_cache_bypass \$http_upgrade;
+    proxy_set_header Host $host;
+    proxy_cache_bypass $http_upgrade;
   }
 }
 NGINX"
   - systemctl restart nginx
-""")
+''')
 
 // APP: Python Flask + MySQL connector, systemd service
-var appUserData = base64("""
+var appUserData = base64('''
 #cloud-config
 runcmd:
   - apt-get update
@@ -396,10 +396,10 @@ UNIT"
   - systemctl daemon-reload
   - systemctl enable app.service
   - systemctl start app.service
-""")
+''')
 
 // DB: MySQL server + schema + seed data
-var dbUserData = base64("""
+var dbUserData = base64('''
 #cloud-config
 runcmd:
   - export DEBIAN_FRONTEND=noninteractive
@@ -419,7 +419,7 @@ CREATE TABLE IF NOT EXISTS items(id INT PRIMARY KEY AUTO_INCREMENT, name VARCHAR
 INSERT INTO items(name) VALUES ('First item'), ('Second item');
 FLUSH PRIVILEGES;
 SQL"
-""")
+''')
 
 // ============== VMs ==============
 resource webVm 'Microsoft.Compute/virtualMachines@2023-09-01' = {
