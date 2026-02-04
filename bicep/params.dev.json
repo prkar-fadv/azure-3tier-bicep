@@ -1,0 +1,13 @@
+
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": { "value": "eastus" },
+    "prefix": { "value": "threeTier" },
+    "adminUsername": { "value": "azureuser" },
+    "adminPassword": { "value": "#{ADMIN_PASSWORD}#" },
+    "mysqlAppPassword": { "value": "#{MYSQL_APP_PASSWORD}#" },
+    "allowedAdminCidr": { "value": "#{ALLOWED_ADMIN_CIDR}#" }
+  }
+}
