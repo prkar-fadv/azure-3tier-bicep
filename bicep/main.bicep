@@ -32,7 +32,7 @@ var dbPrivateIp  = '10.0.3.4'
 // Common
 var vmSize = 'Standard_B2s'
 
-// Images
+// Images (Ubuntu 22.04 LTS Gen2)
 var ubuntuPublisher = 'Canonical'
 var ubuntuOffer     = '0001-com-ubuntu-server-jammy'
 var ubuntuSku       = '22_04-lts-gen2'
@@ -536,6 +536,6 @@ resource dbVm 'Microsoft.Compute/virtualMachines@2023-09-01' = {
   }
 }
 
-// ============== Outputs ==============
-output webPublicIp string = webPublicIp.properties.ipAddress
-output webUrl string = 'http://${webPublicIp.properties.ipAddress}'
+// ============== Outputs (robust) ==============
+output webPublicIpAddress string = reference(webPublicIp.id, '2023-05-01', 'Full').ipAddress
+output webUrl string = 'http://${reference(webPublicIp.id, ''2023-05-01'', ''Full'').ipAddress}'
