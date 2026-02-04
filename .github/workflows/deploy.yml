@@ -9,6 +9,7 @@ env:
   AZURE_RG: rg-3tier-demo
   AZURE_LOCATION: eastus
   TEMPLATE_PATH: bicep/main.bicep
+  PARAMS_PATH: bicep/params.dev.json
   DEPLOYMENT_NAME: three-tier-${{ github.run_id }}
 
 jobs:
@@ -22,7 +23,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # OIDC login — keep these here only
       - name: Azure Login (OIDC)
         uses: azure/login@v2
         with:
@@ -30,23 +30,39 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Create resource group (if not exists)
+      - name: Create/Ensure resource group
         uses: azure/cli@v2
         with:
           inlineScript: |
             az group create -n "$AZURE_RG" -l "$AZURE_LOCATION"
 
-      # Deploy Bicep — only template parameters go under `parameters: |`
+      # Replace tokens in params.json with GitHub secrets (so no heredoc mixing)
+      - name: Prepare parameters file
+        shell: bash
+        run: |
+          set -e
+          cp "${{ env.PARAMS_PATH }}" params.tmp.json
+          sed -i "s~#{ADMIN_PASSWORD}#~${{ secrets.ADMIN_PASSWORD }}~g" params.tmp.json
+          sed -i "s~#{MYSQL_APP_PASSWORD}#~${{ secrets.MYSQL_APP_PASSWORD }}~g" params.tmp.json
+          sed -i "s~#{ALLOWED_ADMIN_CIDR}#~${{ secrets.ALLOWED_ADMIN_CIDR }}~g" params.tmp.json
+
+          echo "----- Effective params.tmp.json -----"
+          cat params.tmp.json | sed 's/".*password.*"/"****"/Ig' | sed 's/".*cidr.*"/"****"/Ig'
+
+      # Optional: validate template & params before deploy (fast fail)
+      - name: Validate deployment
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az deployment group validate \
+              --resource-group "${{ env.AZURE_RG }}" \
+              --template-file "${{ env.TEMPLATE_PATH }}" \
+              --parameters @params.tmp.json
+
       - name: Deploy Bicep
         uses: azure/arm-deploy@v2
         with:
           resourceGroupName: ${{ env.AZURE_RG }}
           template: ${{ env.TEMPLATE_PATH }}
+          parameters: @params.tmp.json
           deploymentName: ${{ env.DEPLOYMENT_NAME }}
-          parameters: |
-            location=${{ env.AZURE_LOCATION }}
-            prefix=threeTier
-            adminUsername=azureuser
-            adminPassword=${{ secrets.ADMIN_PASSWORD }}
-            mysqlAppPassword=${{ secrets.MYSQL_APP_PASSWORD }}
-            allowedAdminCidr=${{ secrets.ALLOWED_ADMIN_CIDR }}
