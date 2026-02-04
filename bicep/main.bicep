@@ -539,4 +539,3 @@ resource dbVm 'Microsoft.Compute/virtualMachines@2023-09-01' = {
 // ============== Outputs ==============
 output webPublicIp string = webPublicIp.properties.ipAddress
 output webUrl string = 'http://${webPublicIp.properties.ipAddress}'
-``
