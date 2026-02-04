@@ -36,18 +36,32 @@ jobs:
           inlineScript: |
             az group create -n "$AZURE_RG" -l "$AZURE_LOCATION"
 
-      - name: Prepare parameters file
+      - name: Prepare parameters file (safe with jq)
         shell: bash
+        env:
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          MYSQL_APP_PASSWORD: ${{ secrets.MYSQL_APP_PASSWORD }}
+          ALLOWED_ADMIN_CIDR: ${{ secrets.ALLOWED_ADMIN_CIDR }}
         run: |
-          set -e
-          cp "${{ env.PARAMS_PATH }}" params.tmp.json
-          sed -i "s~#{ADMIN_PASSWORD}#~${{ secrets.ADMIN_PASSWORD }}~g" params.tmp.json
-          sed -i "s~#{MYSQL_APP_PASSWORD}#~${{ secrets.MYSQL_APP_PASSWORD }}~g" params.tmp.json
-          sed -i "s~#{ALLOWED_ADMIN_CIDR}#~${{ secrets.ALLOWED_ADMIN_CIDR }}~g" params.tmp.json
+          set -euo pipefail
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update -y
+            sudo apt-get install -y jq
+          fi
+          jq \
+            --arg admin "$ADMIN_PASSWORD" \
+            --arg dbpass "$MYSQL_APP_PASSWORD" \
+            --arg cidr "$ALLOWED_ADMIN_CIDR" \
+            '.parameters.adminPassword.value = $admin
+            | .parameters.mysqlAppPassword.value = $dbpass
+            | .parameters.allowedAdminCidr.value = $cidr' \
+            "${{ env.PARAMS_PATH }}" > params.tmp.json
           echo "----- Effective params.tmp.json (secrets masked) -----"
-          cat params.tmp.json | sed 's/\("value":\s*"\)[^"]*\("\)/\1****\2/g'
+          jq '.parameters.adminPassword.value="****"
+              | .parameters.mysqlAppPassword.value="****"
+              | .parameters.allowedAdminCidr.value="****"' params.tmp.json
 
-      - name: Validate template (what-if-style)
+      - name: Validate template
         uses: azure/cli@v2
         with:
           inlineScript: |
