@@ -36,7 +36,6 @@ jobs:
           inlineScript: |
             az group create -n "$AZURE_RG" -l "$AZURE_LOCATION"
 
-      # Replace tokens in params.json with GitHub secrets (so no heredoc mixing)
       - name: Prepare parameters file
         shell: bash
         run: |
@@ -45,12 +44,10 @@ jobs:
           sed -i "s~#{ADMIN_PASSWORD}#~${{ secrets.ADMIN_PASSWORD }}~g" params.tmp.json
           sed -i "s~#{MYSQL_APP_PASSWORD}#~${{ secrets.MYSQL_APP_PASSWORD }}~g" params.tmp.json
           sed -i "s~#{ALLOWED_ADMIN_CIDR}#~${{ secrets.ALLOWED_ADMIN_CIDR }}~g" params.tmp.json
+          echo "----- Effective params.tmp.json (secrets masked) -----"
+          cat params.tmp.json | sed 's/\("value":\s*"\)[^"]*\("\)/\1****\2/g'
 
-          echo "----- Effective params.tmp.json -----"
-          cat params.tmp.json | sed 's/".*password.*"/"****"/Ig' | sed 's/".*cidr.*"/"****"/Ig'
-
-      # Optional: validate template & params before deploy (fast fail)
-      - name: Validate deployment
+      - name: Validate template (what-if-style)
         uses: azure/cli@v2
         with:
           inlineScript: |
@@ -59,10 +56,12 @@ jobs:
               --template-file "${{ env.TEMPLATE_PATH }}" \
               --parameters @params.tmp.json
 
-      - name: Deploy Bicep
-        uses: azure/arm-deploy@v2
+      - name: Deploy with Azure CLI
+        uses: azure/cli@v2
         with:
-          resourceGroupName: ${{ env.AZURE_RG }}
-          template: ${{ env.TEMPLATE_PATH }}
-          parameters: @params.tmp.json
-          deploymentName: ${{ env.DEPLOYMENT_NAME }}
+          inlineScript: |
+            az deployment group create \
+              --resource-group "${{ env.AZURE_RG }}" \
+              --name "${{ env.DEPLOYMENT_NAME }}" \
+              --template-file "${{ env.TEMPLATE_PATH }}" \
+              --parameters @params.tmp.json
